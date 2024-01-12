@@ -68,6 +68,27 @@ impl Feeds {
             modified: AtomicBool::new(false)
         }
     }
+
+    fn add(&self, ids: Vec<H256>) {
+        self.ids.lock().unwrap().push(ids);
+        
+        self.modified.store(true, Ordering::SeqCst);
+    }
+
+    fn remove(&self, ids: &Vec<H256>) {
+        let mut feeds_lock = self.ids.lock().unwrap();
+
+        match feeds_lock.iter().position(|feeds| *feeds == *ids) {
+            Some(index) => {
+                feeds_lock.remove(index);
+                self.modified.store(true, Ordering::SeqCst);
+            },
+            None => {
+                dbg!(&feeds_lock);
+                dbg!(ids);
+            }
+        }
+    }
 }
 
 const GATEWAY_ADDRESS: &str = "127.0.0.1:7071";
@@ -121,13 +142,7 @@ async fn handle_connection(stream: TcpStream, feeds_store: &Feeds, mut rx: Recei
         }
     };
 
-    feeds_store
-        .ids
-        .lock()
-        .unwrap()
-        .push(subscription.ids.clone());
-
-    feeds_store.modified.store(true, Ordering::SeqCst);
+    feeds_store.add(subscription.ids.clone());
 
     loop {
         let price_update: PriceUpdate = match rx.recv().await {
@@ -154,21 +169,7 @@ async fn handle_connection(stream: TcpStream, feeds_store: &Feeds, mut rx: Recei
         }
     }
 
-    let mut feeds_lock = feeds_store.ids.lock().unwrap();
-
-    match feeds_lock
-        .iter()
-        .position(|feeds| *feeds == subscription.ids)
-    {
-        Some(index) => {
-            feeds_lock.remove(index);
-            feeds_store.modified.store(true, Ordering::SeqCst);
-        },
-        None => {
-            dbg!(&feeds_lock);
-            dbg!(&subscription.ids);
-        }
-    };
+    feeds_store.remove(&subscription.ids);
 }
 
 async fn hermes_stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
