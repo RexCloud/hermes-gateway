@@ -91,15 +91,18 @@ impl Feeds {
     }
 }
 
-const GATEWAY_ADDRESS: &str = "127.0.0.1:7071";
-
 const HERMES_WSS_URL: &str = "wss://hermes.pyth.network/ws";
 
 #[tokio::main]
 async fn main() {
-    let listener: TcpListener = TcpListener::bind(GATEWAY_ADDRESS)
+    let address: String = match std::env::args().nth(1) {
+        Some(a) => a,
+        None => "127.0.0.1:7071".to_string()
+    };
+
+    let listener: TcpListener = TcpListener::bind(address)
         .await
-        .expect("can't bind listener to GATEWAY_ADDRESS");
+        .expect("can't bind listener to provided address");
 
     let feeds_store: Arc<Feeds> = Arc::new(Feeds::new());
 
