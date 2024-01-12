@@ -82,7 +82,7 @@ async fn main() {
 
     let feeds_store: Arc<Feeds> = Arc::new(Feeds::new());
 
-    let (tx, rx) = channel::<PriceUpdate>(100);
+    let (tx, rx) = channel::<PriceUpdate>(150);
 
     drop(rx);
 
