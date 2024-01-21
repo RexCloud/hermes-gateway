@@ -1,10 +1,10 @@
-use ethers_core::types::H256;
 use futures_util::{
     FutureExt,
     SinkExt,
     StreamExt,
     TryStreamExt
 };
+use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
