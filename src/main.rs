@@ -200,14 +200,11 @@ async fn hermes_stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
 
         let mut feeds_unique: HashSet<H256> = HashSet::new();
 
-        match feeds_store.ids.lock() {
-            Ok(feeds) => {
-                for feed in feeds.clone().into_iter().flatten() {
-                    feeds_unique.insert(feed);
-                }
-            },
-            _ => {}
-        };
+        if let Ok(feeds) = feeds_store.ids.lock() {
+            for feed in feeds.clone().into_iter().flatten() {
+                feeds_unique.insert(feed);
+            }
+        }
 
         let subscription: Subscription = Subscription {
             ids: feeds_unique.drain().collect(),
