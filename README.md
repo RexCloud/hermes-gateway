@@ -28,3 +28,19 @@ Run with custom address, e.g. `localhost:7081`:
 ```shell
 ./hermes-gateway 127.0.0.1:7081
 ```
+
+Run using Unix socket (IPC) with specified path, e.g. `/tmp/hermes_gateway.ipc`:
+
+```shell
+./hermes-gateway /tmp/hermes_gateway.ipc
+```
+
+Reading from Unix socket connection:
+
+1. Read u16, this value represents price update size
+
+2. Create buffer with this size `vec![0; len]`
+
+3. Read exact size to this buffer
+
+4. Parse buffer into a struct using serde_json
