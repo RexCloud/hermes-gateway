@@ -1,3 +1,5 @@
+[![Build Status](https://img.shields.io/github/actions/workflow/status/RexCloud/hermes-gateway/rust.yml?style=for-the-badge)](https://github.com/RexCloud/hermes-gateway/actions)
+
 ## Why ##
 Running multiple applications that have websocket connections established from same IP address to public Hermes endpoint might get that IP address rate limited, therefore connections will be closed.
 
