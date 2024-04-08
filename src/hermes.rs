@@ -95,7 +95,7 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
         let (mut stream, response) = match connect_async(HERMES_WSS_URL).await {
             Ok((s, r)) => (s, r),
             Err(e) => {
-                dbg!(e);
+                eprintln!("Hermes connection failed ({})", e);
                 sleep(Duration::from_secs(2)).await;
                 continue;
             }
@@ -143,8 +143,8 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
             {
                 Ok(p) => p,
                 Err(e) => {
-                    dbg!(e);
-                    dbg!(msg);
+                    eprintln!("{}", e);
+                    eprintln!("{}", msg.to_text().unwrap());
                     continue;
                 }
             };
