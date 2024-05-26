@@ -5,24 +5,21 @@ use std::{
     collections::HashSet,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex
-    }
+        Mutex,
+    },
 };
 use tokio::{
     sync::broadcast::Sender,
-    time::{sleep, Duration}
+    time::{sleep, Duration},
 };
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::Message
-};
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Subscription {
     pub ids: Vec<H256>,
     r#type: String,
     verbose: bool,
-    binary: bool
+    binary: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -30,7 +27,7 @@ struct Price {
     conf: String,
     expo: i32,
     price: String,
-    publish_time: u32
+    publish_time: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -38,31 +35,25 @@ pub struct PriceFeed {
     ema_price: Price,
     pub id: H256,
     price: Price,
-    vaa: String
+    vaa: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PriceUpdate {
     r#type: String,
-    pub price_feed: PriceFeed
+    pub price_feed: PriceFeed,
 }
 
+#[derive(Default)]
 pub struct Feeds {
     ids: Mutex<Vec<Vec<H256>>>,
-    modified: AtomicBool
+    modified: AtomicBool,
 }
 
 impl Feeds {
-    pub fn new() -> Self {
-        Self {
-            ids: Mutex::new(Vec::new()),
-            modified: AtomicBool::new(false)
-        }
-    }
-
     pub fn add(&self, ids: Vec<H256>) {
         self.ids.lock().unwrap().push(ids);
-        
+
         self.modified.store(true, Ordering::SeqCst);
     }
 
@@ -104,7 +95,7 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
         if response.status().as_u16() != 101 {
             continue;
         }
-        
+
         println!("Connected to Hermes");
 
         let mut feeds_unique: HashSet<H256> = HashSet::new();
@@ -119,9 +110,9 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
             ids: feeds_unique.drain().collect(),
             r#type: "subscribe".to_string(),
             verbose: false,
-            binary: true
+            binary: true,
         };
-        
+
         if let Err(e) = stream
             .send(Message::Text(serde_json::to_string(&subscription).unwrap()))
             .await
@@ -131,14 +122,14 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
         }
 
         stream.next().await;
-        
+
         stream.next().await;
 
         while let Some(Ok(msg)) = stream.next().await {
             if msg.is_ping() || msg.is_close() {
                 continue;
             }
-            
+
             let price_feed_update: PriceUpdate = match serde_json::from_str(msg.to_text().unwrap())
             {
                 Ok(p) => p,

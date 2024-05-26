@@ -1,25 +1,14 @@
-use futures_util::{
-    FutureExt,
-    SinkExt,
-    StreamExt,
-    TryStreamExt
-};
+use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use serde_json;
-use tokio::{
-    net::TcpStream,
-    sync::broadcast::Receiver
-};
-use tokio_tungstenite::{
-    accept_async,
-    tungstenite::Message
-};
+use tokio::{net::TcpStream, sync::broadcast::Receiver};
+use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use crate::hermes::{Feeds, PriceUpdate, Subscription};
 
 pub async fn handle_connection(
     stream: TcpStream,
     feeds_store: &Feeds,
-    mut rx: Receiver<PriceUpdate>
+    mut rx: Receiver<PriceUpdate>,
 ) {
     let mut stream_ws = accept_async(stream).await.expect("can't accept TcpStream");
 
@@ -28,11 +17,11 @@ pub async fn handle_connection(
         Some(Err(e)) => {
             dbg!(e);
             let _ = stream_ws.close(None).await;
-            return
+            return;
         }
         None => {
             let _ = stream_ws.close(None).await;
-            return
+            return;
         }
     };
 
@@ -49,10 +38,11 @@ pub async fn handle_connection(
 
         if subscription.ids.contains(&price_update.price_feed.id) {
             stream_ws.try_next().now_or_never();
-            
-            if let Err(_) = stream_ws
+
+            if stream_ws
                 .send(Message::Text(serde_json::to_string(&price_update).unwrap()))
                 .await
+                .is_err()
             {
                 let _ = stream_ws.close(None).await;
                 break;

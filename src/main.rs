@@ -1,6 +1,6 @@
 use std::{
     io::{Error, ErrorKind, Result},
-    sync::Arc
+    sync::Arc,
 };
 use tokio::{
     net::{TcpListener, TcpStream, UnixListener, UnixStream},
@@ -9,35 +9,32 @@ use tokio::{
 
 use hermes_gateway::{
     hermes::{self, Feeds, PriceUpdate},
-    socket,
-    websocket
+    socket, websocket,
 };
 
 enum Listener {
-    TcpListener(TcpListener),
-    UnixListener(UnixListener)
+    Tcp(TcpListener),
+    Unix(UnixListener),
 }
 
 enum Stream {
-    TcpStream(TcpStream),
-    UnixStream(UnixStream)
+    Tcp(TcpStream),
+    Unix(UnixStream),
 }
 
 impl Listener {
     async fn bind(address: String) -> Result<Self> {
-        let error: Error;
-
-        match TcpListener::bind(&address).await {
-            Ok(l) => return Ok(Listener::TcpListener(l)),
-            Err(e) => error = e
-        }
+        let error: Error = match TcpListener::bind(&address).await {
+            Ok(l) => return Ok(Listener::Tcp(l)),
+            Err(e) => e,
+        };
 
         if let ErrorKind::AddrNotAvailable = error.kind() {
-            return Err(error)
+            return Err(error);
         }
-    
+
         match UnixListener::bind(address) {
-            Ok(l) => Ok(Listener::UnixListener(l)),
+            Ok(l) => Ok(Listener::Unix(l)),
             Err(e) => {
                 dbg!(error);
                 Err(e)
@@ -47,14 +44,14 @@ impl Listener {
 
     async fn accept(&self) -> Result<Stream> {
         match self {
-            Self::TcpListener(l) => match l.accept().await {
-                Ok((stream, _)) => Ok(Stream::TcpStream(stream)),
-                Err(e) => Err(e)
-            }
-            Self::UnixListener(l) => match l.accept().await {
-                Ok((stream, _)) => Ok(Stream::UnixStream(stream)),
-                Err(e) => Err(e)
-            }
+            Self::Tcp(l) => match l.accept().await {
+                Ok((stream, _)) => Ok(Stream::Tcp(stream)),
+                Err(e) => Err(e),
+            },
+            Self::Unix(l) => match l.accept().await {
+                Ok((stream, _)) => Ok(Stream::Unix(stream)),
+                Err(e) => Err(e),
+            },
         }
     }
 }
@@ -63,7 +60,7 @@ impl Listener {
 async fn main() {
     let address: String = match std::env::args().nth(1) {
         Some(a) => a,
-        None => "127.0.0.1:7071".to_string()
+        None => "127.0.0.1:7071".to_string(),
     };
 
     let listener: Listener = match Listener::bind(address).await {
@@ -74,33 +71,29 @@ async fn main() {
         }
     };
 
-    let feeds_store: Arc<Feeds> = Arc::new(Feeds::new());
+    let tx: Sender<PriceUpdate> = channel::<PriceUpdate>(150).0;
 
-    let (tx, rx) = channel::<PriceUpdate>(150);
+    let feeds_store: Arc<Feeds> = Default::default();
 
-    drop(rx);
+    tokio::spawn({
+        let tx: Sender<PriceUpdate> = tx.clone();
 
-    let tx_clone: Sender<PriceUpdate> = tx.clone();
+        let feeds_store: Arc<Feeds> = feeds_store.clone();
 
-    let feeds_store_clone: Arc<Feeds> = feeds_store.clone();
-
-    tokio::spawn(async move {
-        hermes::stream(tx_clone, &feeds_store_clone).await;
+        async move {
+            hermes::stream(tx, &feeds_store).await;
+        }
     });
 
     while let Ok(stream) = listener.accept().await {
-        let feeds_store_clone: Arc<Feeds> = feeds_store.clone();
+        let feeds_store: Arc<Feeds> = feeds_store.clone();
 
         let rx: Receiver<PriceUpdate> = tx.subscribe();
 
         tokio::spawn(async move {
             match stream {
-                Stream::TcpStream(stream) => {
-                    websocket::handle_connection(stream, &feeds_store_clone, rx).await
-                }
-                Stream::UnixStream(stream) => {
-                    socket::handle_connection(stream, &feeds_store_clone, rx).await
-                }
+                Stream::Tcp(stream) => websocket::handle_connection(stream, &feeds_store, rx).await,
+                Stream::Unix(stream) => socket::handle_connection(stream, &feeds_store, rx).await,
             }
         });
     }

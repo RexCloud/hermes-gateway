@@ -2,7 +2,7 @@ use serde_json;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
-    sync::broadcast::Receiver
+    sync::broadcast::Receiver,
 };
 
 use crate::hermes::{Feeds, PriceUpdate, Subscription};
@@ -10,7 +10,7 @@ use crate::hermes::{Feeds, PriceUpdate, Subscription};
 pub async fn handle_connection(
     mut stream: UnixStream,
     feeds_store: &Feeds,
-    mut rx: Receiver<PriceUpdate>
+    mut rx: Receiver<PriceUpdate>,
 ) {
     let mut buf: Vec<u8> = vec![0; 4096];
 
@@ -22,7 +22,7 @@ pub async fn handle_connection(
                 let _ = stream.shutdown().await;
                 return;
             }
-        }
+        },
         Err(e) => {
             dbg!(e);
             let _ = stream.shutdown().await;
@@ -48,7 +48,7 @@ pub async fn handle_connection(
 
             let len: [u8; 2] = (data.len() as u16).to_be_bytes();
 
-            if let Err(_) = stream.write_all(&[&len[..], &data].concat()).await {
+            if stream.write_all(&[&len[..], &data].concat()).await.is_err() {
                 let _ = stream.shutdown().await;
                 break;
             }
