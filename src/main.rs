@@ -4,6 +4,7 @@ use tokio::{
     net::{TcpListener, TcpStream, UnixListener, UnixStream},
     sync::broadcast::{channel, Receiver, Sender},
 };
+use tracing_subscriber::{util::SubscriberInitExt, FmtSubscriber};
 
 use hermes_gateway::{
     hermes::{self, Feeds, PriceUpdate},
@@ -63,6 +64,8 @@ impl Listener {
 #[tokio::main]
 async fn main() {
     let listener: Listener = Listener::bind(Socket::parse()).await;
+
+    FmtSubscriber::builder().compact().finish().init();
 
     let tx: Sender<PriceUpdate> = channel::<PriceUpdate>(150).0;
 

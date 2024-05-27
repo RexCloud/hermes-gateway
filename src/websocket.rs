@@ -2,8 +2,9 @@ use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use serde_json;
 use tokio::{net::TcpStream, sync::broadcast::Receiver};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tracing::error;
 
-use crate::hermes::{Feeds, PriceUpdate, Subscription};
+use crate::hermes::{recv, Feeds, PriceUpdate, Subscription};
 
 pub async fn handle_connection(
     stream: TcpStream,
@@ -15,7 +16,7 @@ pub async fn handle_connection(
     let subscription: Subscription = match stream_ws.next().await {
         Some(Ok(msg)) => serde_json::from_str(msg.to_text().unwrap()).unwrap(),
         Some(Err(e)) => {
-            dbg!(e);
+            error!("{e}");
             let _ = stream_ws.close(None).await;
             return;
         }
@@ -28,13 +29,7 @@ pub async fn handle_connection(
     feeds_store.add(subscription.ids.clone());
 
     loop {
-        let price_update: PriceUpdate = match rx.recv().await {
-            Ok(p) => p,
-            Err(e) => {
-                dbg!(e);
-                continue;
-            }
-        };
+        let price_update: PriceUpdate = recv(&mut rx).await;
 
         if subscription.ids.contains(&price_update.price_feed.id) {
             stream_ws.try_next().now_or_never();

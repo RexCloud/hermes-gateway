@@ -4,8 +4,9 @@ use tokio::{
     net::UnixStream,
     sync::broadcast::Receiver,
 };
+use tracing::error;
 
-use crate::hermes::{Feeds, PriceUpdate, Subscription};
+use crate::hermes::{recv, Feeds, PriceUpdate, Subscription};
 
 pub async fn handle_connection(
     mut stream: UnixStream,
@@ -18,13 +19,13 @@ pub async fn handle_connection(
         Ok(len) => match serde_json::from_slice(&buf[..len]) {
             Ok(s) => s,
             Err(e) => {
-                dbg!(e);
+                error!("{e}");
                 let _ = stream.shutdown().await;
                 return;
             }
         },
         Err(e) => {
-            dbg!(e);
+            error!("Read failed: {e}");
             let _ = stream.shutdown().await;
             return;
         }
@@ -35,13 +36,7 @@ pub async fn handle_connection(
     feeds_store.add(subscription.ids.clone());
 
     loop {
-        let price_update: PriceUpdate = match rx.recv().await {
-            Ok(p) => p,
-            Err(e) => {
-                dbg!(e);
-                continue;
-            }
-        };
+        let price_update: PriceUpdate = recv(&mut rx).await;
 
         if subscription.ids.contains(&price_update.price_feed.id) {
             let data: Vec<u8> = serde_json::to_vec(&price_update).unwrap();

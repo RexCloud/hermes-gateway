@@ -9,10 +9,11 @@ use std::{
     },
 };
 use tokio::{
-    sync::broadcast::Sender,
+    sync::broadcast::{Receiver, Sender},
     time::{sleep, Duration},
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Subscription {
@@ -66,8 +67,7 @@ impl Feeds {
                 self.modified.store(true, Ordering::SeqCst);
             }
             None => {
-                dbg!(&feeds_lock);
-                dbg!(ids);
+                error!(?ids, feeds_store = ?feeds_lock, "Couldn't find ids in feeds store");
             }
         }
     }
@@ -86,7 +86,7 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
         let (mut stream, response) = match connect_async(HERMES_WSS_URL).await {
             Ok((s, r)) => (s, r),
             Err(e) => {
-                eprintln!("Hermes connection failed ({})", e);
+                error!("Couldn't connect to {HERMES_WSS_URL}: {e}");
                 sleep(Duration::from_secs(2)).await;
                 continue;
             }
@@ -95,8 +95,6 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
         if response.status().as_u16() != 101 {
             continue;
         }
-
-        println!("Connected to Hermes");
 
         let mut feeds_unique: HashSet<H256> = HashSet::new();
 
@@ -117,12 +115,11 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
             .send(Message::Text(serde_json::to_string(&subscription).unwrap()))
             .await
         {
-            dbg!(e);
+            error!("{e}");
             continue;
         }
 
         stream.next().await;
-
         stream.next().await;
 
         while let Some(Ok(msg)) = stream.next().await {
@@ -133,9 +130,8 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
             let price_feed_update: PriceUpdate = match serde_json::from_str(msg.to_text().unwrap())
             {
                 Ok(p) => p,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    eprintln!("{}", msg.to_text().unwrap());
+                Err(_) => {
+                    error!("{}", msg.to_text().unwrap());
                     continue;
                 }
             };
@@ -143,9 +139,23 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
             let _ = tx.send(price_feed_update);
 
             if feeds_store.modified.load(Ordering::SeqCst) {
-                println!("Reconnecting to Hermes with updated feeds, if any");
+                info!("Feeds store updated");
                 break;
             }
         }
+
+        info!("Reconnecting to Hermes");
+    }
+}
+
+pub async fn recv(rx: &mut Receiver<PriceUpdate>) -> PriceUpdate {
+    loop {
+        match rx.recv().await {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("{e}");
+                continue;
+            }
+        };
     }
 }
