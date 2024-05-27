@@ -33,9 +33,7 @@ Options:
   -h, --help  Print help
 ```
 
-Default: `127.0.0.1:7071` for `ws` and `/tmp/hermes_gateway.ipc` for `ipc`
-
-Run with custom address or path:
+Run with custom address or path (Default: `127.0.0.1:7071` for `ws` and `/tmp/hermes_gateway.ipc` for `ipc`):
 
 ```shell
 ./hermes-gateway ws 127.0.0.1:7081
