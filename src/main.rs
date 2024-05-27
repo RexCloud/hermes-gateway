@@ -1,7 +1,5 @@
-use std::{
-    io::{Error, ErrorKind, Result},
-    sync::Arc,
-};
+use clap::Parser;
+use std::{io::Result, sync::Arc};
 use tokio::{
     net::{TcpListener, TcpStream, UnixListener, UnixStream},
     sync::broadcast::{channel, Receiver, Sender},
@@ -11,6 +9,24 @@ use hermes_gateway::{
     hermes::{self, Feeds, PriceUpdate},
     socket, websocket,
 };
+
+#[derive(Parser)]
+#[command(about)]
+enum Socket {
+    /// Run on websocket
+    Ws {
+        /// Address to listen for ws connections
+        #[arg(default_value = "127.0.0.1:7071")]
+        address: String,
+    },
+
+    /// Run on Unix socket
+    Ipc {
+        /// Path to listen for ipc connections
+        #[arg(default_value = "/tmp/hermes_gateway.ipc")]
+        path: String,
+    },
+}
 
 enum Listener {
     Tcp(TcpListener),
@@ -23,53 +39,30 @@ enum Stream {
 }
 
 impl Listener {
-    async fn bind(address: String) -> Result<Self> {
-        let error: Error = match TcpListener::bind(&address).await {
-            Ok(l) => return Ok(Listener::Tcp(l)),
-            Err(e) => e,
-        };
-
-        if let ErrorKind::AddrNotAvailable = error.kind() {
-            return Err(error);
-        }
-
-        match UnixListener::bind(address) {
-            Ok(l) => Ok(Listener::Unix(l)),
-            Err(e) => {
-                dbg!(error);
-                Err(e)
-            }
+    async fn bind(socket: Socket) -> Self {
+        match socket {
+            Socket::Ws { address } => Listener::Tcp(TcpListener::bind(address).await.unwrap()),
+            Socket::Ipc { path } => Listener::Unix(UnixListener::bind(path).unwrap()),
         }
     }
 
     async fn accept(&self) -> Result<Stream> {
         match self {
-            Self::Tcp(l) => match l.accept().await {
-                Ok((stream, _)) => Ok(Stream::Tcp(stream)),
-                Err(e) => Err(e),
-            },
-            Self::Unix(l) => match l.accept().await {
-                Ok((stream, _)) => Ok(Stream::Unix(stream)),
-                Err(e) => Err(e),
-            },
+            Self::Tcp(listener) => listener
+                .accept()
+                .await
+                .map(|(stream, _)| Stream::Tcp(stream)),
+            Self::Unix(listener) => listener
+                .accept()
+                .await
+                .map(|(stream, _)| Stream::Unix(stream)),
         }
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let address: String = match std::env::args().nth(1) {
-        Some(a) => a,
-        None => "127.0.0.1:7071".to_string(),
-    };
-
-    let listener: Listener = match Listener::bind(address).await {
-        Ok(l) => l,
-        Err(e) => {
-            dbg!(e);
-            return;
-        }
-    };
+    let listener: Listener = Listener::bind(Socket::parse()).await;
 
     let tx: Sender<PriceUpdate> = channel::<PriceUpdate>(150).0;
 

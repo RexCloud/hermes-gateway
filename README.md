@@ -17,24 +17,32 @@ cargo build --release
 
 Move compiled file or `cd` into `target/release`
 
-Run using this command:
-
 ```shell
 ./hermes-gateway
 ```
 
-Gateway will start accepting connections at `localhost:7071`
+```
+Usage: hermes-gateway <COMMAND>
 
-Run with custom address, e.g. `localhost:7081`:
+Commands:
+  ws    Run on websocket
+  ipc   Run on Unix socket
+  help  Print this message or the help of the given subcommand(s)
 
-```shell
-./hermes-gateway 127.0.0.1:7081
+Options:
+  -h, --help  Print help
 ```
 
-Run using Unix socket (IPC) with specified path, e.g. `/tmp/hermes_gateway.ipc`:
+Default: `127.0.0.1:7071` for `ws` and `/tmp/hermes_gateway.ipc` for `ipc`
+
+Run with custom address or path:
 
 ```shell
-./hermes-gateway /tmp/hermes_gateway.ipc
+./hermes-gateway ws 127.0.0.1:7081
+```
+
+```shell
+./hermes-gateway ipc /path/to/socket
 ```
 
 Reading from Unix socket connection:
