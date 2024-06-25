@@ -1,4 +1,3 @@
-use serde_json;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,

@@ -1,5 +1,4 @@
 use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use serde_json;
 use tokio::{net::TcpStream, sync::broadcast::Receiver};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 use tracing::error;
