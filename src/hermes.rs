@@ -151,7 +151,7 @@ pub async fn stream(tx: Sender<PriceUpdate>, feeds_store: &Feeds) {
 pub async fn recv(rx: &mut Receiver<PriceUpdate>) -> PriceUpdate {
     loop {
         match rx.recv().await {
-            Ok(p) => p,
+            Ok(p) => return p,
             Err(e) => {
                 warn!("{e}");
                 continue;
