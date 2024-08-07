@@ -12,7 +12,7 @@ pub async fn handle_connection(
     feeds_store: &Feeds,
     mut rx: Receiver<PriceUpdate>,
 ) {
-    let mut buf: Vec<u8> = vec![0; 4096];
+    let mut buf: Vec<u8> = vec![0; 8192];
 
     let subscription: Subscription = match stream.read(&mut buf).await {
         Ok(len) => match serde_json::from_slice(&buf[..len]) {
